@@ -13,105 +13,101 @@ a = {(3, 2, 0), (9, 6, 3)} à paramétrer ?
 Position.is_temp must be deleted ??
 """
 
-DIM_NAME = ['_x', '_y', '_z']
-NB_DIMENSION = len(DIM_NAME)
+from copy import deepcopy
+
 POSITION_TYPE = tuple
 
 class Position:
     # ne prend que du tuple en entrée ou en sortie
     def __init__(self, position: tuple, is_temp=False):
-        self._is_temp = is_temp
-        self.get = position
+        self.is_temp = is_temp
+        self._get = position
         # if is_temp is True, this Position can be modified or deleted
 
     def __add__(self, value):
-        if self.is_temp:
-            result = self
-        elif type(value) is type(self) and value.is_temp:
-            self, value = value, self # possible because a+b == b+a
-            result = self
-        else:
-            result = self.temp_copy()
-        # here, result is a temp Position with self.get position
+        return self.set(POSITION_TYPE([i + j for i, j in zip(self, value)]))
+    __radd__ = __add__
 
-        lst = []
-        for index in range(NB_DIMENSION):
-            lst.append(result[index]+value[index]) # value can be tuple or Position
-        result.get = POSITION_TYPE(lst)
-        return result
+    def __sub__(self, value): # position - (x, y) or position - position
+        return self.set(POSITION_TYPE([i - j for i, j in zip(self, value)]))
 
-    def __sub__(self, value):
-        if type(value) is POSITION_TYPE:
-            value = type(self)(value, is_temp=True)
+    def __rsub__(self, value): # (x, y) - Position
+        return self.set(POSITION_TYPE([j - i for i, j in zip(self, value)]))
 
-        return self + (-value)  # go __add__
+    def __iter__(self):
+        yield from (i for i in self._get)
+
+    def set_temp(self, bool):
+        self.is_temp = bool
 
     def temp_copy(self):
-        return type(self)(self.get, is_temp=True)
+        if self.is_temp:
+            return self
+        self = deepcopy(self)
+        self.is_temp = True
+        return self
 
     def __getitem__(self, value):
-        return getattr(self, DIM_NAME[value], 0)
+        return self._get[value]
 
     # temporary Position
     # Position = -Position or Position.get = -Position
     def __neg__(self):
-        if not self.is_temp:
-            self = self.temp_copy()
-        self.get = POSITION_TYPE([-i for i in self.get])
-        # opti but not clear
-        #self.get = POSITION_TYPE([-getattr(self, i, 0) for i in DIM_NAME])
+        self.set(POSITION_TYPE([-value for value in self]))
         return self
 
     @property
-    def is_temp(self):
-        return self._is_temp
-
-    @property
-    # test : len(Position.get) == NB_DIMENSION
     def get(self):
-        # too heavy ?
-        return POSITION_TYPE([getattr(self, i) for i in DIM_NAME])
+        return self._get
 
-    @get.setter
-    # objet.position.get = (0, 1, 0)
-    def get(self, value) -> None:
-        for index, name in enumerate(DIM_NAME):
-            setattr(self, name, value[index])
+    def set(self, value):
+        if not self.is_temp:
+            self = deepcopy(self)
+            self.is_temp = True
+        self._get = value
+        return self
 
     @property
     def x(self):
-        return getattr(self, DIM_NAME[0], 0)
+        return self[0]
 
     @property
     def y(self):
-        return getattr(self, DIM_NAME[1], 0)
+        return self[1]
 
     @property
     def z(self):
-        return getattr(self, DIM_NAME[2], 0)
+        return self[2]
 
-    # new possible case : item.position == item2.position
-    # instead of : item.position.get == item2.position.get
+    # item.position == item2.position or tuple == position or position == tuple
     def __eq__(self, value):
-        if type(self) is type(value): # comparaison between Position and Position
-            return self.get == value.get
-        elif type(value) is POSITION_TYPE: # comparaison between Position and tuple
-            return self.get == value
-        return False
+        return getattr(self, "get", self) == getattr(value, "get", value)
 
     def move(self, direction: tuple):
-        self.get += direction
+        # certitude que self est une position non temporaire et que celle-ci sera écrasée
+        # si cette certitude n'est plus, conditionner les is_temp
+        self.is_temp = True
+        self + direction # because the new position is saved in self
+        self.is_temp = False
 
     def teleport(self, new_position: tuple):
-        self.get = new_position
+        # certitude que self est une position non temporaire et que celle-ci sera écrasée
+        # si cette certitude n'est plus, conditionner les is_temp
+        self.is_temp = True
+        self.set(new_position)
+        self.is_temp = False
 
-    def range(self, target):
-        if type(self) is type(target):
-            result = 0
-            new_position = self - target
-            for name in DIM_NAME:
-                result += getattr(new_position, name, 0)**2
-            return result**0.5
+def sub_pos_sq(self, target):
+    yield from ((a - b)**2 for a, b in zip(self, target))
+
+def dist(self, target):
+    result = 0
+    for point in sub_pos_sq(self, target):
+        result += point
+    return result**0.5
+
+def in_range(self, target, dist):
+    return dist(self, target) <= dist
 
 """
 # set(Position)
@@ -137,9 +133,3 @@ class Positions:
         return retour
 
 """
-
-# tests
-
-a = Position((0, 0, 0))
-b = a + (0, 1, 3) + (0, 3, 1) - (9, 3, 1)
-print(b.get)
