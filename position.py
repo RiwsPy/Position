@@ -1,113 +1,90 @@
 """
-objectif : pouvoir gérer de façon simple et intuitive des positions en 3 (ou X) dimensions
-possibilités : ajout de position : a = position(X, Y, Z) + (A, B, C) - (3, 1, 2)
-a.get renvoie les nouvelles coordonnées
-a.x, a.y, a.z renvoie les coordonnées individuelles
-a.get = (2, 9, 1) fonctionnel
+    Use to manage tuple of positions
 
-ajout de tuple dans un set : a = Positions() + (X, Y, Z) - (A, B, C)
-a.get renvoie le nouveau set de coordonnées
-a = {(3, 2, 0), (9, 6, 3)} à paramétrer ?
-> pour l'instant ça passe par a = Positions((3, 2, 0), (9, 6, 3))
+    >>> from position import Position
+    >>> a = Position((1, 2, 3))
+    >>> b = (3, 4, 7)
+    >>> a = a+b+a
+    >>> a
+    (5, 8, 13)
 
-Position.is_temp must be deleted ??
+    >>> from position import Position
+    >>> a = Position((1, 7, 3))
+    >>> b = (3, 4)
+    >>> a = a+b
+    >>> a
+    (4, 11, 3)
 """
 
-from copy import deepcopy
+from itertools import zip_longest
 
 POSITION_TYPE = tuple
 
-class Position:
-    # ne prend que du tuple en entrée ou en sortie
-    def __init__(self, position: tuple, is_temp=False):
-        self.is_temp = is_temp
-        self._get = position
-        # if is_temp is True, this Position can be modified or deleted
+class Position(POSITION_TYPE):
+    def __new__(cls, pos):
+        return super().__new__(cls, pos)
 
     def __add__(self, value):
-        return self.set(POSITION_TYPE([i + j for i, j in zip(self, value)]))
+        """
+            Return self+value
+
+            *param value: iterable with integer
+            *rtype: tuple
+        """
+        return self.__class__([i + j for i, j in zip_longest(self, value, fillvalue=0)])
     __radd__ = __add__
 
     def __sub__(self, value): # position - (x, y) or position - position
-        return self.set(POSITION_TYPE([i - j for i, j in zip(self, value)]))
+        """
+            Return self - value
+
+            *param value: iterable with integer
+        """
+        return self.__class__([i - j for i, j in zip_longest(self, value, fillvalue=0)])
 
     def __rsub__(self, value): # (x, y) - Position
-        return self.set(POSITION_TYPE([j - i for i, j in zip(self, value)]))
+        """
+            Return value - self
 
-    def __iter__(self):
-        yield from (i for i in self._get)
+            *param value: iterable with integer
+        """
+        return self.__class__([j - i for i, j in zip_longest(self, value, fillvalue=0)])
 
-    def set_temp(self, bool):
-        self.is_temp = bool
-
-    def temp_copy(self):
-        if self.is_temp:
-            return self
-        self = deepcopy(self)
-        self.is_temp = True
-        return self
-
-    def __getitem__(self, value):
-        return self._get[value]
-
-    # temporary Position
-    # Position = -Position or Position.get = -Position
     def __neg__(self):
-        self.set(POSITION_TYPE([-value for value in self]))
+        """
+            Return -Position
+
+            *rtype: POSITION_TYPE
+        """
+        return self.__class__([-i for i in self])
+
+    def move(self, direction):
+        """
+            self.position += direction
+
+            *param direction: iterable
+            *rtype: None
+        """
+        self += direction
         return self
 
-    @property
-    def get(self):
-        return self._get
+    def iset(self, new_position):
+        """
+            Erase and return the object position by ``new_position``
 
-    def set(self, value):
-        if not self.is_temp:
-            self = deepcopy(self)
-            self.is_temp = True
-        self._get = value
-        return self
+            *type new_position: iterable
+            *rtype: POSITION_TYPE
+        """
+        return self.__class__(new_position)
 
-    @property
-    def x(self):
-        return self[0]
+    def square_dist(self, target) ->  int:
+        """
+            Return the square distance between self and target
 
-    @property
-    def y(self):
-        return self[1]
-
-    @property
-    def z(self):
-        return self[2]
-
-    # item.position == item2.position or tuple == position or position == tuple
-    def __eq__(self, value):
-        return getattr(self, "get", self) == getattr(value, "get", value)
-
-    def move(self, direction: tuple):
-        # certitude que self est une position non temporaire et que celle-ci sera écrasée
-        # si cette certitude n'est plus, conditionner les is_temp
-        self.is_temp = True
-        self + direction # because the new position is saved in self
-        self.is_temp = False
-
-    def teleport(self, new_position: tuple):
-        # certitude que self est une position non temporaire et que celle-ci sera écrasée
-        # si cette certitude n'est plus, conditionner les is_temp
-        self.is_temp = True
-        self.set(new_position)
-        self.is_temp = False
-
-def sub_pos_sq(self, target):
-    yield from ((a - b)**2 for a, b in zip(self, target))
-
-def dist(self, target):
-    result = 0
-    for point in sub_pos_sq(self, target):
-        result += point
-    return result**0.5
-
-def in_range(self, target, dist):
-    return dist(self, target) <= dist
+            *type target: tuple, list or position.Position
+            *rtype: int
+        """
+        return sum([(a - b)*(a - b) for a, b in zip_longest(self, target, fillvalue=0)])
 
 """
 # set(Position)
@@ -133,3 +110,12 @@ class Positions:
         return retour
 
 """
+
+
+if __name__ == "__main__":
+    a = Position((1, 2, 3))
+    print(a + (1, 2, 3))
+    print(a.move((1, 2, 3)))
+    import doctest
+    doctest.testmod()
+
